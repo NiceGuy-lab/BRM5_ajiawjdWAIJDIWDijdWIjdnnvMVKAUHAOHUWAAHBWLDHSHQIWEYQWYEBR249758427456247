@@ -26,6 +26,7 @@ local _G_State = {
 	Aimbot_TargetNPCs = true,
 	Aimbot_Crosshair = nil,
 	Aimbot_Smoothness = 0.5,
+	AutoReload = true,
 	Calibrating = false,
 	WarningAccepted = false
 }
@@ -39,27 +40,24 @@ local CalibrateBtnRef = nil
 local CachedNPCs = {}
 local LastNPCCheck = 0
 
--- Легкий сканер (не использует GetDescendants, чтобы не лагало)
-local function UpdateNPCList()
+local function ScanEntities()
 	local newNPCs = {}
-	for _, obj in pairs(Workspace:GetChildren()) do
-		if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
-			if not Players:GetPlayerFromCharacter(obj) then
-				newNPCs[obj] = true
-			end
-		elseif obj:IsA("Folder") or obj:IsA("Model") then
-			-- Заглядываем на 1 уровень вглубь (обычно там лежат папки вроде "Enemies" или "NPCs")
-			for _, child in pairs(obj:GetChildren()) do
-				if child:IsA("Model") and child:FindFirstChild("Humanoid") and child:FindFirstChild("HumanoidRootPart") then
-					if not Players:GetPlayerFromCharacter(child) then
-						newNPCs[child] = true
-					end
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("Model") and obj ~= LocalPlayer.Character then
+			local hum = obj:FindFirstChildOfClass("Humanoid") or obj:FindFirstChild("Humanoid")
+			local root = obj:FindFirstChild("HumanoidRootPart")
+			if hum and root then
+				if not Players:GetPlayerFromCharacter(obj) then
+					newNPCs[obj] = true
 				end
 			end
 		end
 	end
 	CachedNPCs = newNPCs
+	LastNPCCheck = tick()
 end
+
+task.spawn(ScanEntities)
 
 local function GetAimPart(character)
 	if not character then return nil end
@@ -732,6 +730,23 @@ end)
 UIUtils.CreateToggle(aimSet, "Target Players", _G_State.Aimbot_TargetPlayers, function(v) _G_State.Aimbot_TargetPlayers = v end)
 UIUtils.CreateToggle(aimSet, "Target NPCs", _G_State.Aimbot_TargetNPCs, function(v) _G_State.Aimbot_TargetNPCs = v end)
 
+local ConfigPage = UIUtils.CreateTab("Configure", 2)
+
+UIUtils.CreateButton(ConfigPage, "Manual Reload Entities", function()
+	task.spawn(ScanEntities)
+end)
+
+local AutoReloadBtn = nil
+AutoReloadBtn = UIUtils.CreateButton(ConfigPage, "Auto-Reload: ON", function()
+	_G_State.AutoReload = not _G_State.AutoReload
+	if _G_State.AutoReload then
+		AutoReloadBtn.Text = "Auto-Reload: ON"
+		LastNPCCheck = tick()
+	else
+		AutoReloadBtn.Text = "Auto-Reload: OFF"
+	end
+end)
+
 local function ApplyHighlight(obj, isPlayer)
 	local storage = isPlayer and ESP_Player_Highlights or ESP_NPC_Highlights
 	local hl = storage[obj]
@@ -762,11 +777,9 @@ local function ApplyHighlight(obj, isPlayer)
 	end
 end
 
--- Легкое обновление каждые 2 секунды
 Connections.ScannerLoop = RunService.Heartbeat:Connect(function()
-	if tick() - LastNPCCheck > 2 then
-		LastNPCCheck = tick()
-		task.spawn(UpdateNPCList)
+	if _G_State.AutoReload and (tick() - LastNPCCheck >= 120) then
+		task.spawn(ScanEntities)
 	end
 end)
 
