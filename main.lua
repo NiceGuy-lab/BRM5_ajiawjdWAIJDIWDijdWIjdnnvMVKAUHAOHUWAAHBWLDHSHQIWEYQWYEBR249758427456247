@@ -44,10 +44,11 @@ local function ScanEntities()
 	local newNPCs = {}
 	for _, obj in ipairs(Workspace:GetDescendants()) do
 		if obj:IsA("Model") and obj ~= LocalPlayer.Character then
-			local hum = obj:FindFirstChildOfClass("Humanoid") or obj:FindFirstChild("Humanoid")
-			local root = obj:FindFirstChild("HumanoidRootPart")
-			if hum and root then
-				if not Players:GetPlayerFromCharacter(obj) then
+			-- Ищем гуманоид
+			local hum = obj:FindFirstChildOfClass("Humanoid")
+			if hum then
+				-- Убеждаемся, что это не игрок и что у модели есть хоть какая-то физическая деталь
+				if not Players:GetPlayerFromCharacter(obj) and obj:FindFirstChildWhichIsA("BasePart") then
 					newNPCs[obj] = true
 				end
 			end
@@ -59,13 +60,18 @@ end
 
 task.spawn(ScanEntities)
 
+local function GetAnyPart(obj)
+	if not obj then return nil end
+	return obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+end
+
 local function GetAimPart(character)
 	if not character then return nil end
 	local partName = _G_State.Aimbot_TargetPart
 	if partName == "Torso" then
-		return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+		return character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
 	end
-	return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+	return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
 end
 
 local function ClearHighlightList(list)
@@ -771,7 +777,8 @@ local function ApplyHighlight(obj, isPlayer)
 		hl.Enabled = _G_State.ESP_NPCs_Enabled
 	end
 	
-	if not obj.Parent or not obj:FindFirstChild("HumanoidRootPart") then
+	-- Проверка на наличие хотя бы одной детали (а не обязательно HumanoidRootPart)
+	if not obj.Parent or not GetAnyPart(obj) then
 		hl:Destroy()
 		storage[obj] = nil
 	end
@@ -786,7 +793,7 @@ end)
 Connections.ESP_Loop = RunService.Heartbeat:Connect(function()
 	if _G_State.ESP_Players_Enabled then
 		for _, plr in pairs(Players:GetPlayers()) do
-			if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+			if plr ~= LocalPlayer and plr.Character and GetAnyPart(plr.Character) then
 				ApplyHighlight(plr.Character, true)
 			end
 		end
@@ -794,7 +801,7 @@ Connections.ESP_Loop = RunService.Heartbeat:Connect(function()
 	
 	if _G_State.ESP_NPCs_Enabled then
 		for npc, _ in pairs(CachedNPCs) do
-			if npc.Parent and npc:FindFirstChild("HumanoidRootPart") then
+			if npc.Parent and GetAnyPart(npc) then
 				ApplyHighlight(npc, false)
 			else
 				CachedNPCs[npc] = nil
@@ -807,14 +814,14 @@ Connections.ESP_Loop = RunService.Heartbeat:Connect(function()
 	end
 	
 	for char, hl in pairs(ESP_Player_Highlights) do
-		if not _G_State.ESP_Players_Enabled or not char.Parent or not char:FindFirstChild("HumanoidRootPart") then
+		if not _G_State.ESP_Players_Enabled or not char.Parent or not GetAnyPart(char) then
 			hl:Destroy()
 			ESP_Player_Highlights[char] = nil
 		end
 	end
 	
 	for npc, hl in pairs(ESP_NPC_Highlights) do
-		if not _G_State.ESP_NPCs_Enabled or not npc.Parent or not npc:FindFirstChild("HumanoidRootPart") then
+		if not _G_State.ESP_NPCs_Enabled or not npc.Parent or not GetAnyPart(npc) then
 			hl:Destroy()
 			ESP_NPC_Highlights[npc] = nil
 		end
