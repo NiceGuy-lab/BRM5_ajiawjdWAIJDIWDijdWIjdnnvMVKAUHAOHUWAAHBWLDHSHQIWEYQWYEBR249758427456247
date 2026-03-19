@@ -44,12 +44,16 @@ local function ScanEntities()
 	local newNPCs = {}
 	for _, obj in ipairs(Workspace:GetDescendants()) do
 		if obj:IsA("Model") and obj ~= LocalPlayer.Character then
-			-- Ищем гуманоид
 			local hum = obj:FindFirstChildOfClass("Humanoid")
-			if hum then
-				-- Убеждаемся, что это не игрок и что у модели есть хоть какая-то физическая деталь
-				if not Players:GetPlayerFromCharacter(obj) and obj:FindFirstChildWhichIsA("BasePart") then
-					newNPCs[obj] = true
+			if hum and hum.Health > 0 then
+				local head = obj:FindFirstChild("Head")
+				local root = obj:FindFirstChild("HumanoidRootPart")
+				local torso = obj:FindFirstChild("UpperTorso") or obj:FindFirstChild("Torso")
+				
+				if head and root and torso then
+					if not Players:GetPlayerFromCharacter(obj) then
+						newNPCs[obj] = true
+					end
 				end
 			end
 		end
@@ -62,16 +66,16 @@ task.spawn(ScanEntities)
 
 local function GetAnyPart(obj)
 	if not obj then return nil end
-	return obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+	return obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("UpperTorso") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head")
 end
 
 local function GetAimPart(character)
 	if not character then return nil end
 	local partName = _G_State.Aimbot_TargetPart
 	if partName == "Torso" then
-		return character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
+		return character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
 	end
-	return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
+	return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
 end
 
 local function ClearHighlightList(list)
@@ -777,7 +781,6 @@ local function ApplyHighlight(obj, isPlayer)
 		hl.Enabled = _G_State.ESP_NPCs_Enabled
 	end
 	
-	-- Проверка на наличие хотя бы одной детали (а не обязательно HumanoidRootPart)
 	if not obj.Parent or not GetAnyPart(obj) then
 		hl:Destroy()
 		storage[obj] = nil
